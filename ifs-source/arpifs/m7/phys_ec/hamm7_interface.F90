@@ -542,6 +542,8 @@ ASSOCIATE( &
          & RRHTAB         => YREAERSNK%RRHTAB,                     &
          & RNICE          => YRECLDP%RNICE,                        & !default for ICNC
          & RCLDMAX        => YRECLDP%RCLDMAX,                      & !max cloud value
+         & LAERICESED     => YRECLDP%LAERICESED,                   &
+         & LAERICEAUTO    => YRECLDP%LAERICEAUTO,                  &
          & NSTART         => YDRIP%NSTART                          ) 
 
 ! & NINDSCAV=>YREAERATM%NINDSCAV, NTSCAV=>YREAERATM%NTSCAV, &
@@ -977,7 +979,9 @@ ENDDO
        
        ! Store effective radii in PGFL
        PGFL(KIDIA:KFDIA,1:KLEV,YRE_LIQ%MP9_PH) = 1.0E-06_JPRB * REFFL(KIDIA:KFDIA,1:KLEV,ZKROW) ! convert um to meters
-       PGFL(KIDIA:KFDIA,1:KLEV,YRE_ICE%MP9_PH) = 1.0E-06_JPRB * REFFI(KIDIA:KFDIA,1:KLEV,ZKROW) ! convert um to meters
+       IF (LAERICESED .OR. LAERICEAUTO) THEN
+         PGFL(KIDIA:KFDIA,1:KLEV,YRE_ICE%MP9_PH) = 1.0E-06_JPRB * REFFI(KIDIA:KFDIA,1:KLEV,ZKROW) ! convert um to meters
+       ENDIF
        
     ELSE IF (NCLOUDACT == 2) THEN ! AR&G scheme
 
@@ -1102,7 +1106,7 @@ ENDDO
     ZXTTE_CLD(KIDIA:KFDIA,1:KLEV,IDT_ICNC) = (ZXTM1(KIDIA:KFDIA,1:KLEV,IDT_ICNC) - ZICNC_temp(KIDIA:KFDIA,1:KLEV))/time_step_len
     
     !-----------------------------------------------------------------
-    !--> Calculation of effective radii (Note: already done if NCLOUDACT=1)
+    !--> Calculation of liquid effective radii (Note: already done if NCLOUDACT=1)
     IF (NCLOUDACT == 2 .OR. NCLOUDACT == 0 ) THEN
 
       DO JK=1,KLEV
@@ -1116,6 +1120,12 @@ ENDDO
       ! Add liq. eff. rad. to HAM variables (only if there is liquid cloud else minimum value)
       REFFL(KIDIA:KFDIA,1:KLEV,ZKROW) = MERGE(ZRE_LIQ(KIDIA:KFDIA,1:KLEV), ZDEF_RE_LIQ, LLIQCLD(KIDIA:KFDIA,1:KLEV))
 
+      ! add effective radii to PGFL fields
+      PGFL(KIDIA:KFDIA,1:KLEV,YRE_LIQ%MP9_PH) = 1.0E-06_JPRB * REFFL(KIDIA:KFDIA,1:KLEV,ZKROW) ! convert um to meters and save to PGFL fields
+    ENDIF
+
+    !--> Calculation of ice effective radii (Note: already done if NCLOUDACT=1 *and* (LAERICESED .OR. LAERICEAUTO) )
+    IF (.NOT. (NCLOUDACT==1 .AND. (LAERICESED .OR. LAERICEAUTO) )) THEN
       CALL ICE_EFFECTIVE_RADIUS(YRERAD, YDSPP_CONFIG, KIDIA, KFDIA, KLON, KLEV, &
            &  PRSF1, PTP, ZAP, PIP, PSP, PGEMU, & ! pressure, temp, cloud fr., IWC, SWC, sine of latitude
            &  reffi(1:KLON,1:KLEV,ZKROW)) ! ice effective radius (updated to mo_activ variable 'reffi' which used in mo_ham_wetdep)
@@ -1124,7 +1134,6 @@ ENDDO
       REFFI(KIDIA:KFDIA,1:KLEV,ZKROW) = MERGE(REFFI(KIDIA:KFDIA,1:KLEV,ZKROW), ZDEF_RE_ICE, LICECLD(KIDIA:KFDIA,1:KLEV))
 
       ! add effective radii to PGFL fields
-      PGFL(KIDIA:KFDIA,1:KLEV,YRE_LIQ%MP9_PH) = 1.0E-06_JPRB * REFFL(KIDIA:KFDIA,1:KLEV,ZKROW) ! convert um to meters and save to PGFL fields
       PGFL(KIDIA:KFDIA,1:KLEV,YRE_ICE%MP9_PH) = 1.0E-06_JPRB * REFFI(KIDIA:KFDIA,1:KLEV,ZKROW) ! convert um to meters and save to PGFL fields
     ENDIF
 
