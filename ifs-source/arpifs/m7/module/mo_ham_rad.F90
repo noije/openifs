@@ -68,7 +68,7 @@ MODULE mo_ham_rad
                               sizeclass,            &
                               nclass
   USE mo_ham,           ONLY: subm_aerospec 
-  USE mo_kind,          ONLY: dp
+  USE mo_kind,          ONLY: dp, THRESHOLD
   USE mo_species,       ONLY: speclist, naerospec, nmaxspec
   !>>dod soa
   USE mo_ham_species,   ONLY: id_oc, id_wat    !!mgs!!   , naerospec=>ham_naerospec, aerospec=>ham_aerospec
@@ -240,7 +240,7 @@ CONTAINS
     
     !---executable procedure
 
-    zeps=EPSILON(1.0_dp)
+    zeps = THRESHOLD ! Used for both physical cutoff and safe division
 
     !>>dod openmp bugfix removed allocation of arrays
 
@@ -304,7 +304,7 @@ CONTAINS
     !---Weighted averaging:
     DO jk=1,klev
        DO jl=1,kproma
-          IF(zvsum(jl,jk)>zeps) THEN
+          IF(zvsum(jl,jk)>zeps) THEN ! safe division
 
              pnr(jl,jk)=znrsum(jl,jk)/zvsum(jl,jk)
              pni(jl,jk)=znisum(jl,jk)/zvsum(jl,jk)
@@ -372,7 +372,7 @@ CONTAINS
     !--- Local variables:
 
     INTEGER  :: jl, jk, jt, jn
-    REAL(dp) :: zdensity, zeps, zv, zvfrac
+    REAL(dp) :: zdensity, zeps, zv, zvfrac, zepsrel
 
     INTEGER :: ikey
 
@@ -393,7 +393,8 @@ CONTAINS
  
     !---executable procedure
 
-    zeps=EPSILON(1.0_dp)
+    zeps = THRESHOLD   ! Used for both physical cutoff and safe division
+    zepsrel = EPSILON(1._dp)*100. ! Used for bound checking
 
     !>>dod openmp bugfix removed allocation of arrays
     !<<dod
@@ -466,8 +467,7 @@ CONTAINS
     DO jk=1,klev
        DO jl=1,kproma
     !<<dod
-      
-          IF(zvsum(jl,jk)>zeps) THEN
+          IF(zvsum(jl,jk)>zeps) THEN ! Safe division
              cn_eff(jl,jk)=CMPLX( znrsum(jl,jk)/zvsum(jl,jk) , znisum(jl,jk)/zvsum(jl,jk), kind=dp )
           ELSE
              cn_eff(jl,jk)=CMPLX( 0.0_dp , 0.0_dp, kind=dp )
@@ -486,9 +486,8 @@ CONTAINS
     DO jk=1,klev
        DO jl=1,kproma
     !<<dod
-      
-          IF (zvsum(jl,jk)>zeps) THEN
-             IF (zvcore(jl,jk)/zvsum(jl,jk)>zeps .AND. zvcore(jl,jk)/zvsum(jl,jk)<(1.0_dp-zeps)) THEN
+          IF (zvsum(jl,jk)>0._dp) THEN
+             IF (zvcore(jl,jk) > zvsum(jl,jk)*zepsrel .AND. zvcore(jl,jk) < zvsum(jl,jk)*(1.0_dp-zepsrel)) THEN
                 lcore(jl,jk)=.TRUE.
              END IF
           END IF
@@ -536,7 +535,7 @@ CONTAINS
              
        DO jk=1, klev
           DO jl=1, kproma
-             IF(pxtm1(jl,jk,jt)>zeps) THEN
+             IF(pxtm1(jl,jk,jt)>zeps) THEN !Physical cutoff
                       
                 zv=pxtm1(jl,jk,jt)/zdensity
 
@@ -556,8 +555,7 @@ CONTAINS
 
     DO jk=1,klev
        DO jl=1,kproma
-      
-          IF(zvsum(jl,jk)>zeps .AND. lcore(jl,jk)) THEN
+          IF(zvsum(jl,jk)>zeps .AND. lcore(jl,jk)) THEN ! Safe division
              cn_0(jl,jk)=CMPLX( znrsum(jl,jk)/zvsum(jl,jk) , znisum(jl,jk)/zvsum(jl,jk), kind=dp )
           ELSE
              cn_0(jl,jk)=CMPLX( 0.0_dp , 0.0_dp, kind=dp )
@@ -629,7 +627,7 @@ CONTAINS
 
              DO jk=1,klev
                 DO jl=1,kproma
-                   IF(pxtm1(jl,jk,jt)>zeps .AND. lcore(jl,jk)) THEN
+                   IF(pxtm1(jl,jk,jt)>zeps .AND. lcore(jl,jk)) THEN !Physical cutoff/safe division implied
 
                       zvfrac=(pxtm1(jl,jk,jt)/zdensity) / zvsum(jl,jk)
 
@@ -749,7 +747,7 @@ CONTAINS
 
     !---executable procedure
 
-    zeps=EPSILON(1.0_dp)
+    zeps=THRESHOLD   ! Used for both physical cutoff and safe division 
 
     !>>dod deleted allocation of arrays
     !<<dod
@@ -999,7 +997,7 @@ CONTAINS
 
     !--- 0) Initialization:
 
-    zeps=EPSILON(1.0_dp)
+    zeps=EPSILON(1._dp)*10._dp   ! Used for comparisons with sigma_coarse and sigma_fine 
 
     sigma(1:kproma,:,:,:)=0._dp
     omega(1:kproma,:,:,:)=0._dp
@@ -1071,9 +1069,9 @@ CONTAINS
 
                 CASE(HAM_M7)
 
-                   IF (ABS(modesigma(jclass)-sigma_fine)<zeps) THEN
+                   IF (ABS(modesigma(jclass)-sigma_fine) < zeps*sigma_fine) THEN
                       itable=1
-                   ELSE IF  ((ABS(modesigma(jclass)-sigma_coarse)<zeps)) THEN
+                   ELSE IF (ABS(modesigma(jclass)-sigma_coarse) < zeps*sigma_coarse) THEN
                       itable=2
                    ELSE 
                       CALL finish('ham_rad','incompatible standard deviation in modal setup')
@@ -1181,10 +1179,11 @@ CONTAINS
 
           DO jk=1, klev
              DO jl=1, kproma
-                IF(aer_piz_sw_vr(jl,jk,jwv)>EPSILON(1.0_dp)) THEN 
+                ! PLS - TODO: SAFE DIVISION
+                IF (aer_piz_sw_vr(jl,jk,jwv) > THRESHOLD ) THEN 
                    aer_cg_sw_vr(jl,jk,jwv) =aer_cg_sw_vr(jl,jk,jwv)/aer_piz_sw_vr(jl,jk,jwv)
                 END IF
-                IF(aer_tau_sw_vr(jl,jk,jwv)>EPSILON(1.0_dp)) THEN 
+                IF (aer_tau_sw_vr(jl,jk,jwv) > THRESHOLD ) THEN 
                    aer_piz_sw_vr(jl,jk,jwv)=aer_piz_sw_vr(jl,jk,jwv)/aer_tau_sw_vr(jl,jk,jwv)
                 END IF
              END DO
@@ -1246,9 +1245,9 @@ CONTAINS
                 CASE(HAM_M7)
 
 
-                   IF (ABS(modesigma(jclass)-sigma_fine)<zeps) THEN
+                   IF (ABS(modesigma(jclass)-sigma_fine) < zeps*sigma_fine) THEN
                       itable=3
-                   ELSE IF  ((ABS(modesigma(jclass)-sigma_coarse)<zeps)) THEN
+                   ELSE IF (ABS(modesigma(jclass)-sigma_coarse) < zeps*sigma_coarse) THEN
                       itable=4
                    ELSE 
                       CALL finish('ham_rad','incompatible standard deviation in modal setup')
@@ -1382,9 +1381,9 @@ CONTAINS
 
                 CASE(HAM_M7)
 
-                   IF (ABS(modesigma(jclass)-sigma_fine)<zeps) THEN
+                   IF (ABS(modesigma(jclass)-sigma_fine) < zeps*sigma_fine) THEN
                       itable=1
-                   ELSE IF  ((ABS(modesigma(jclass)-sigma_coarse)<zeps)) THEN
+                   ELSE IF (ABS(modesigma(jclass)-sigma_coarse) < zeps*sigma_coarse) THEN
                       itable=2
                    ELSE 
                       CALL finish('ham_rad','incompatible standard deviation in modal setup')
@@ -1498,7 +1497,8 @@ CONTAINS
 
           DO jk=1, klev
              DO jl=1, kproma
-               IF(zaer_ssa_diag(jl,jk,jwv)>EPSILON(1.0_dp)) THEN 
+               ! PLS - TODO: SAFE DIVISION
+               IF (zaer_ssa_diag(jl,jk,jwv) > THRESHOLD) THEN 
                  zaer_asym_diag(jl,jk,jwv) = zaer_asym_diag(jl,jk,jwv)/zaer_ssa_diag(jl,jk,jwv)
                  zaer_ssa_diag(jl,jk,jwv)  = zaer_ssa_diag(jl,jk,jwv)/ zaer_tau_diag(jl,jk,jwv)
                 END IF
@@ -2048,7 +2048,7 @@ CONTAINS
 
           !--- 0)
 
-          zeps=EPSILON(1.0_dp)
+          zeps = EPSILON(1.0_dp)  ! Usage must be checked. Not done yet since we do not use HAMMOZ
 
           !--- Optical thickness for optional wavelengths:
 
@@ -2272,7 +2272,7 @@ CONTAINS
 
                          DO jk=1, klev
                             DO jl=1, kproma
-                               IF (zvsum(jl,jk,jclass)>zeps) THEN
+                              IF (zvsum(jl,jk,jclass)>zeps) THEN
                                   ztaucomp(jl)=ztaucomp(jl) + &
                                        tau_p(jl,jk,krow)*zvcomp(jl,jk,jspec,jclass)/zvsum(jl,jk,jclass)
                                   zabscomp(jl)=zabscomp(jl) + &

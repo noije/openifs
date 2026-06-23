@@ -59,16 +59,16 @@
 
 MODULE mo_ham_m7
 
-USE mo_kind,          ONLY: dp
+  USE mo_kind,          ONLY: dp, THRESHOLD
+  USE parkind1,         ONLY: JPRD
   
-IMPLICIT NONE
+  IMPLICIT NONE
 
-PRIVATE
+  PRIVATE
+  PUBLIC      :: m7, m7_cumulative_normal
 
-PUBLIC      :: m7, m7_cumulative_normal
-
-!REAL(dp), PUBLIC, ALLOCATABLE :: rwet_m7(:,:,:), rdry_m7(:,:,:)
-!REAL(dp), PUBLIC, ALLOCATABLE :: densaer_m7(:,:,:), aerwat_m7(:,:,:)
+  !REAL(dp), PUBLIC, ALLOCATABLE :: rwet_m7(:,:,:), rdry_m7(:,:,:)
+  !REAL(dp), PUBLIC, ALLOCATABLE :: densaer_m7(:,:,:), aerwat_m7(:,:,:)
 
 CONTAINS
 
@@ -143,192 +143,17 @@ SUBROUTINE m7_cumulative_normal ( arg, presult, ccum )
   !   functions, and proper selection of the machine-dependent
   !   constants.
   !
-  !  Explanation of machine-dependent constants.
-  !
-  !   MIN   = smallest machine representable number.
-  !
-  !   EPS   = argument below which anorm(x) may be represented by
-  !           0.5  and above which  x*x  will not underflow.
-  !           A conservative value is the largest machine number X
-  !           such that   1.0 + X = 1.0   to machine precision.
-  !
-  !  Error returns
-  !
-  !  The program returns  ANORM = 0     for  ARG .LE. XLOW.
-  !
-  !  Author: 
-  !
-  !    W. J. Cody
-  !    Mathematics and Computer Science Division
-  !    Argonne National Laboratory
-  !    Argonne, IL 60439
-  !
-  !  Latest modification: March 15, 1992
   !
   USE mo_kind, ONLY: dp
   !
   IMPLICIT NONE
   !
-  REAL(dp), PARAMETER, DIMENSION ( 5 ) :: a = (/ &
-       2.2352520354606839287e00_dp, &
-       1.6102823106855587881e02_dp, &
-       1.0676894854603709582e03_dp, &
-       1.8154981253343561249e04_dp, &
-       6.5682337918207449113e-2_dp /)
-  REAL(dp) :: arg
-  REAL(dp), PARAMETER, DIMENSION ( 4 ) :: b = (/ &
-       4.7202581904688241870e01_dp, &
-       9.7609855173777669322e02_dp, &
-       1.0260932208618978205e04_dp, &
-       4.5507789335026729956e04_dp /)
-  REAL(dp), PARAMETER, DIMENSION ( 9 ) :: c = (/ &
-       3.9894151208813466764e-1_dp, &
-       8.8831497943883759412e00_dp, &
-       9.3506656132177855979e01_dp, &
-       5.9727027639480026226e02_dp, &
-       2.4945375852903726711e03_dp, &
-       6.8481904505362823326e03_dp, &
-       1.1602651437647350124e04_dp, &
-       9.8427148383839780218e03_dp, &
-       1.0765576773720192317e-8_dp /)
-  REAL(dp) :: ccum
-  REAL(dp), PARAMETER, DIMENSION ( 8 ) :: d = (/ &
-       2.2266688044328115691e01_dp, &
-       2.3538790178262499861e02_dp, &
-       1.5193775994075548050e03_dp, &
-       6.4855582982667607550e03_dp, &
-       1.8615571640885098091e04_dp, &
-       3.4900952721145977266e04_dp, &
-       3.8912003286093271411e04_dp, &
-       1.9685429676859990727e04_dp /)
-  REAL(dp) :: del
-!@@@ REAL(dp) :: dpmpar
-  REAL(dp) :: eps
-  INTEGER :: i
-  REAL(dp) :: zmin
-  REAL(dp), PARAMETER, DIMENSION ( 6 ) :: p = (/ &
-       2.1589853405795699e-1_dp, &
-       1.274011611602473639e-1_dp, &
-       2.2235277870649807e-2_dp, &
-       1.421619193227893466e-3_dp, &
-       2.9112874951168792e-5_dp, &
-       2.307344176494017303e-2_dp /)
-  REAL(dp), PARAMETER, DIMENSION ( 5 ) :: q = (/ &
-       1.28426009614491121e00_dp, &
-       4.68238212480865118e-1_dp, &
-       6.59881378689285515e-2_dp, &
-       3.78239633202758244e-3_dp, &
-       7.29751555083966205e-5_dp /)
-  REAL(dp) :: presult
-  REAL(dp), PARAMETER :: root32 = 5.656854248_dp
-  REAL(dp), PARAMETER :: sixten = 16.0_dp
-  REAL(dp) :: temp
-  REAL(dp), PARAMETER :: sqrpi = 3.9894228040143267794e-1_dp
-  REAL(dp), PARAMETER :: thrsh = 0.66291_dp
-  REAL(dp) :: x
-  REAL(dp) :: xden
-  REAL(dp) :: xnum
-  REAL(dp) :: y
-  REAL(dp) :: xsq
+  REAL(dp), INTENT(IN) :: arg
+  REAL(dp), INTENT(OUT) :: ccum
+  REAL(dp), INTENT(OUT) :: presult
 
-
-  !REAL(dp), ALLOCATABLE :: rwet_m7(:,:,:), rdry_m7(:,:,:)
-  !REAL(dp), ALLOCATABLE :: densaer_m7(:,:,:), aerwat_m7(:,:,:)
-  !
-  !  Machine dependent constants
-  !
-  eps = EPSILON ( 1.0_dp ) * 0.5_dp
-  !
-  !@@@ Simplified calculation of the smallest machine representable number
-  !    (Higher accuracy than needed!)
-  !
-  !@@@ min = dpmpar(2)
-
-  zmin = EPSILON ( 1.0_dp )
-
-  x = arg
-  y = ABS ( x )
-
-  IF ( y <= thrsh ) THEN
-     !
-     !  Evaluate  anorm  for  |X| <= 0.66291
-     !
-     IF ( y > eps ) THEN
-        xsq = x * x
-     ELSE
-        xsq = 0.0_dp
-     END IF
-
-     xnum = a(5) * xsq
-     xden = xsq
-     DO i = 1, 3
-        xnum = ( xnum + a(i) ) * xsq
-        xden = ( xden + b(i) ) * xsq
-     END DO
-     presult = x * ( xnum + a(4) ) / ( xden + b(4) )
-     temp = presult
-     presult = 0.5_dp + temp
-     ccum = 0.5_dp - temp
-     !
-     !  Evaluate ANORM for 0.66291 <= |X| <= sqrt(32)
-     !
-  ELSE IF ( y <= root32 ) THEN
-
-     xnum = c(9) * y
-     xden = y
-!DIR$ UNROLL
-!CDIR UNROLL=7
-     DO i = 1, 7
-        xnum = ( xnum + c(i) ) * y
-        xden = ( xden + d(i) ) * y
-     END DO
-     presult = ( xnum + c(8) ) / ( xden + d(8) )
-     xsq = AINT ( y * sixten ) / sixten
-     del = ( y - xsq ) * ( y + xsq )
-     presult = EXP(-xsq*xsq*0.5_dp) * EXP(-del*0.5_dp) * presult
-     ccum = 1.0_dp - presult
-
-     IF ( x > 0.0_dp ) THEN
-        temp = presult
-        presult = ccum
-        ccum = temp
-     END IF
-     !
-     !  Evaluate  anorm  for |X| > sqrt(32).
-     !
-  ELSE
-
-     presult = 0.0_dp
-     xsq = 1.0_dp / ( x * x )
-     xnum = p(6) * xsq
-     xden = xsq
-     DO i = 1, 4
-        xnum = ( xnum + p(i) ) * xsq
-        xden = ( xden + q(i) ) * xsq
-     END DO
-
-     presult = xsq * ( xnum + p(5) ) / ( xden + q(5) )
-     presult = ( sqrpi - presult ) / y
-     xsq = AINT ( x * sixten ) / sixten
-     del = ( x - xsq ) * ( x + xsq )
-     presult = EXP ( - xsq * xsq * 0.5_dp ) * EXP ( - del * 0.5_dp ) * presult
-     ccum = 1.0_dp - presult  
-
-     IF ( x > 0.0_dp ) THEN
-        temp = presult
-        presult = ccum
-        ccum = temp
-     END IF
-
-  END IF
-
-  IF ( presult < zmin ) THEN
-     presult = 0.0_dp
-  END IF
-
-  IF ( ccum < zmin ) THEN
-     ccum = 0.0_dp
-  END IF
+  presult = 0.5_dp * (1.0_dp + erf(arg / sqrt(2.0_dp)))
+  ccum = 0.5_dp * erfc(arg / sqrt(2.0_dp))
 
 END SUBROUTINE m7_cumulative_normal
 
@@ -913,6 +738,7 @@ SUBROUTINE m7_averageproperties(kproma, kbdim, klev, krow, paernl, paerml, pttn,
 
         ztmp2(1:kproma,:) = ram2cmr(jclass)*((ztmp1(1:kproma,:)/z4piover3)**(1._dp/3._dp))
 
+        ! Use cminrad as fallback instead of keeping stale pm6rp? TODO check        
         pm6rp(1:kproma,:,jclass) = MERGE(ztmp2(1:kproma,:), pm6rp(1:kproma,:,jclass), ll1(1:kproma,:))
 
         !<<SF #458 (replacing WHERE statements)
@@ -1124,9 +950,10 @@ SUBROUTINE m7_kappa(kproma, kbdim, klev, krow, prelhum, paernl, pttn, ptp1, &
 
         DO jk=1,klev
            DO jl=1,kproma
+              ! Note: kappa is clamped to [kappa_min, kappa_max] after this division.
               zkappa(jl,jk,jclass) = zkappa(jl,jk,jclass) + &
                                      zunitfac * speclist(jspec)%kappa * &
-                                     (pttn(jl,jk,jn)/zdensity) / (zdryvol(jl,jk,jclass) + cepssec) 
+                                     (pttn(jl,jk,jn)/zdensity) / MAX( cepssec, zdryvol(jl,jk,jclass) )
            END DO
         END DO
      END IF
@@ -1149,7 +976,7 @@ SUBROUTINE m7_kappa(kproma, kbdim, klev, krow, prelhum, paernl, pttn, ptp1, &
               ix_k = 1 + NINT(zksteps*(zk1-kappa_min)/zKrange) ! linear interpolation from actual
                                                                  ! kappa to lookup table entry
 
-              zr1 = 1.E-2*zm6dry_safe(jl,jk)                  ! LOG of radius in m.
+              zr1 = 1.E-2_dp*zm6dry_safe(jl,jk)                  ! LOG of radius in m.
               zr2 = LOG(zr1)         
                
               zr3 = MAX(zr2, ln_Rd_min)                       ! limit to at least Rd_min
@@ -2140,16 +1967,20 @@ SUBROUTINE m7_prod_cond(kproma, kbdim,  klev,  krow, &
   !
   
   INTEGER :: jl,jk
-  
+
   REAL(dp):: zqtmst
-  REAL(dp):: zh2so4_cf0 ! Start [H2SO4(g)] [molec. cm-3] in the cloud-free part of the grid box
-  REAL(dp):: zh2so4_cf1 ! End [H2SO4(g)] [molec. cm-3] in the cloud-free part of the grid box
-  REAL(dp):: zh2so4_cy0 ! Start [H2SO4(g)] [molec. cm-3] in the cloudy part of the grid box
-  REAL(dp):: zh2so4_cy1 ! End [H2SO4(g)] [molec. cm-3] in the cloudy part of the grid box
-             
-  REAL(dp):: zfcond_cf  ! [H2SO4(g)] condensing during the time step in the cloud-free part of the grid box
-  REAL(dp):: zfcond_cy  ! [H2SO4(g)] condensing during the time step in the cloudy part of the grid box
-  
+  REAL(JPRD):: zh2so4_cf0 ! Start [H2SO4(g)] [molec. cm-3] in the cloud-free part of the grid box (JPRD for precision)
+  REAL(JPRD):: zh2so4_cf1 ! End [H2SO4(g)] [molec. cm-3] in the cloud-free part of the grid box (JPRD for precision)
+  REAL(JPRD):: zh2so4_cy0 ! Start [H2SO4(g)] [molec. cm-3] in the cloudy part of the grid box (JPRD for precision)
+  REAL(JPRD):: zh2so4_cy1 ! End [H2SO4(g)] [molec. cm-3] in the cloudy part of the grid box (JPRD for precision)
+
+  REAL(JPRD):: zfcond_cf  ! [H2SO4(g)] condensing during the time step in the cloud-free part of the grid box (JPRD for precision)
+  REAL(JPRD):: zfcond_cy  ! [H2SO4(g)] condensing during the time step in the cloudy part of the grid box (JPRD for precision)
+
+  REAL(JPRD):: zpcs_safe  ! Floored condensation sink for safe division (JPRD for precision)
+  REAL(JPRD):: zdpso4g    ! Production rate in JPRD (JPRD for precision)
+  REAL(JPRD):: zpcs_ts    ! pcs * time_step_len in JPRD (JPRD for precision)
+
   REAL(dp):: cc         ! Corrected cloud cover [0,1]
   
   ! Initialisations:
@@ -2163,89 +1994,95 @@ SUBROUTINE m7_prod_cond(kproma, kbdim,  klev,  krow, &
     DO jl=1,kproma
       
       IF (pcs(jl,jk) > 1.0E-10_dp) THEN  ! Regular H2SO4 condensation sink of the aerosol
-        
+
+        ! Floor pcs for safe division and promote to JPRD for precision-critical condensation calculation
+        zpcs_safe = MAX(REAL(pcs(jl,jk), JPRD), 1.0E-10_JPRD)
+        zdpso4g = REAL(dpso4g(jl,jk), JPRD)
+        zpcs_ts = zpcs_safe * REAL(time_step_len, JPRD)
+
         ! Safety check on the cloud fraction:
         cc = min(paclc(jl,jk),1.0_dp)
         cc = max(cc,0.0_dp)
-        
+
         !
         ! Cloud-free part of the grid box:
         !
-        
+
         ! Start [H2SO4(g)]:
-        zh2so4_cf0 = pso4g(jl,jk)
-        
+        zh2so4_cf0 = REAL(pso4g(jl,jk), JPRD)
+
         ! End [H2SO4(g)]:
         zh2so4_cf1 = &
-        (zh2so4_cf0 - dpso4g(jl,jk)/pcs(jl,jk))*exp(-pcs(jl,jk)*time_step_len) &
-        + dpso4g(jl,jk)/pcs(jl,jk)
-        
+        (zh2so4_cf0 - zdpso4g/zpcs_safe)*EXP(-zpcs_ts) &
+        + zdpso4g/zpcs_safe
+
         ! Safety check:
-        zh2so4_cf1 = max(zh2so4_cf1,0.0_dp)
+        zh2so4_cf1 = MAX(zh2so4_cf1, 0.0_JPRD)
         
         !
         ! Cloudy part of the grid box:
         !
-        
+
         ! Start [H2SO4(g)]:
-        zh2so4_cy0 = pso4g(jl,jk)
-        
+        zh2so4_cy0 = REAL(pso4g(jl,jk), JPRD)
+
         ! End [H2SO4(g)]:
-        zh2so4_cy1 = 0.0_dp
-        
-        ! 
+        zh2so4_cy1 = 0.0_JPRD
+
+        !
         ! New grid box-averaged [H2SO4(g)]:
         !
-        
-        pso4g(jl,jk) = (1.0_dp-cc)*zh2so4_cf1 + cc*zh2so4_cy1
-        
+
+        pso4g(jl,jk) = REAL((1.0_JPRD-REAL(cc,JPRD))*zh2so4_cf1 + REAL(cc,JPRD)*zh2so4_cy1, dp)
+
         ! [H2SO4(g)] that condensed onto aerosol particles during the time step
         ! in the cloud-free and cloudy part of the grid box:
-        
-        zfcond_cf = (1.0_dp-cc)*(zh2so4_cf0 - zh2so4_cf1 + dpso4g(jl,jk)*time_step_len)
-        zfcond_cy = cc*(zh2so4_cy0 - zh2so4_cy1 + dpso4g(jl,jk)*time_step_len)
+
+        zfcond_cf = (1.0_JPRD-REAL(cc,JPRD))*(zh2so4_cf0 - zh2so4_cf1 + zdpso4g*REAL(time_step_len,JPRD))
+        zfcond_cy = REAL(cc,JPRD)*(zh2so4_cy0 - zh2so4_cy1 + zdpso4g*REAL(time_step_len,JPRD))
         
         ! Distribute H2SO4(g) condensing in the cloud-free part of the grid box
         ! on the soluble and insoluble aerosol modes according to their
         ! condensation sinks:
-        
-        paerml(jl,jk,iso4ns) = paerml(jl,jk,iso4ns) + pcsi(jl,jk,iso4ns)/pcs(jl,jk)*zfcond_cf
-        paerml(jl,jk,iso4ks) = paerml(jl,jk,iso4ks) + pcsi(jl,jk,iso4ks)/pcs(jl,jk)*zfcond_cf
-        paerml(jl,jk,iso4as) = paerml(jl,jk,iso4as) + pcsi(jl,jk,iso4as)/pcs(jl,jk)*zfcond_cf
-        paerml(jl,jk,iso4cs) = paerml(jl,jk,iso4cs) + pcsi(jl,jk,iso4cs)/pcs(jl,jk)*zfcond_cf
-        
+
+        paerml(jl,jk,iso4ns) = paerml(jl,jk,iso4ns) + REAL(REAL(pcsi(jl,jk,iso4ns),JPRD)/zpcs_safe*zfcond_cf, dp)
+        paerml(jl,jk,iso4ks) = paerml(jl,jk,iso4ks) + REAL(REAL(pcsi(jl,jk,iso4ks),JPRD)/zpcs_safe*zfcond_cf, dp)
+        paerml(jl,jk,iso4as) = paerml(jl,jk,iso4as) + REAL(REAL(pcsi(jl,jk,iso4as),JPRD)/zpcs_safe*zfcond_cf, dp)
+        paerml(jl,jk,iso4cs) = paerml(jl,jk,iso4cs) + REAL(REAL(pcsi(jl,jk,iso4cs),JPRD)/zpcs_safe*zfcond_cf, dp)
+
         ! Number of H2SO4 molecules condensing on the insoluble modes:
         ! (Transfer from insoluble to soluble modes is calculated in m7_concoag)
-        
-        pso4_5(jl,jk) = pcsi(jl,jk,5)/pcs(jl,jk)*zfcond_cf
-        pso4_6(jl,jk) = pcsi(jl,jk,6)/pcs(jl,jk)*zfcond_cf
-        pso4_7(jl,jk) = pcsi(jl,jk,7)/pcs(jl,jk)*zfcond_cf
+
+        pso4_5(jl,jk) = REAL(REAL(pcsi(jl,jk,5),JPRD)/zpcs_safe*zfcond_cf, dp)
+        pso4_6(jl,jk) = REAL(REAL(pcsi(jl,jk,6),JPRD)/zpcs_safe*zfcond_cf, dp)
+        pso4_7(jl,jk) = REAL(REAL(pcsi(jl,jk,7),JPRD)/zpcs_safe*zfcond_cf, dp)
         
         ! Commit the H2SO4(g) condensing in the cloudy part of the grid box
         ! to the largest aerosol mode, assuming that that mode contributes
         ! aerosol particles that activated and became cloud droplets:
-        
+
         IF (pcsi(jl,jk,iso4cs) > 0.0_dp) THEN
-          paerml(jl,jk,iso4cs) = paerml(jl,jk,iso4cs) + zfcond_cy
+          paerml(jl,jk,iso4cs) = paerml(jl,jk,iso4cs) + REAL(zfcond_cy, dp)
         ELSEIF (pcsi(jl,jk,iso4as) > 0.0_dp) THEN
-          paerml(jl,jk,iso4as) = paerml(jl,jk,iso4as) + zfcond_cy
+          paerml(jl,jk,iso4as) = paerml(jl,jk,iso4as) + REAL(zfcond_cy, dp)
         ELSEIF (pcsi(jl,jk,iso4ks) > 0.0_dp) THEN
-          paerml(jl,jk,iso4ks) = paerml(jl,jk,iso4ks) + zfcond_cy
+          paerml(jl,jk,iso4ks) = paerml(jl,jk,iso4ks) + REAL(zfcond_cy, dp)
         ELSEIF (pcsi(jl,jk,iso4ns) > 0.0_dp) THEN
-          paerml(jl,jk,iso4ns) = paerml(jl,jk,iso4ns) + zfcond_cy
+          paerml(jl,jk,iso4ns) = paerml(jl,jk,iso4ns) + REAL(zfcond_cy, dp)
         ELSEIF (pcsi(jl,jk,7) > 0.0_dp) THEN
-          pso4_7(jl,jk) = pso4_7(jl,jk) + zfcond_cy
+          pso4_7(jl,jk) = pso4_7(jl,jk) + REAL(zfcond_cy, dp)
         ELSEIF (pcsi(jl,jk,6) > 0.0_dp) THEN
-          pso4_6(jl,jk) = pso4_6(jl,jk) + zfcond_cy
+          pso4_6(jl,jk) = pso4_6(jl,jk) + REAL(zfcond_cy, dp)
         ELSEIF (pcsi(jl,jk,5) > 0.0_dp) THEN
-          pso4_5(jl,jk) = pso4_5(jl,jk) + zfcond_cy
+          pso4_5(jl,jk) = pso4_5(jl,jk) + REAL(zfcond_cy, dp)
         ENDIF
         
         ! Vertically integrate mass of condensed sulfate for diagnostics,
         ! converting [molec. cm-3] to [kg(SO4) m-2]:
 #ifdef HAMMOZ
         d_cond_so4(jl,krow) = d_cond_so4(jl,krow) &
-         + (((zfcond_cf + zfcond_cy)*mw_so4*1.E3_dp)/avo)*pdz(jl,jk)*zqtmst*delta_time
+         + REAL((((zfcond_cf + zfcond_cy)*REAL(mw_so4,JPRD)*1.E3_JPRD)/REAL(avo,JPRD)) &
+              *REAL(pdz(jl,jk),JPRD)*REAL(zqtmst,JPRD)*REAL(delta_time,JPRD), dp)
 #endif
       ELSE ! H2SO4 condensation sink of the aerosol extremely small:
         
@@ -2387,7 +2224,7 @@ SUBROUTINE m7_nuck(kproma,  kbdim,  klev,   krow,          &
   
   zqtmst = 1.0_dp/ztmst
   
-  zeps = EPSILON(1.0_dp)
+  zeps = THRESHOLD
   
   ! Relative humidity [%]:
   
@@ -3039,7 +2876,7 @@ SUBROUTINE m7_dconc(kproma, kbdim, klev, krow, paerml, paernl, pm6dry)
   zfconm(:,:,:) = 1._dp
   zfconn(:,:,:) = 1._dp
 
-  zeps = EPSILON(1._dp)
+  zeps = THRESHOLD ! threshold for numerical zero in CDF comparisons
 
   !
   !--- 1) Identify how much the mode jclass has grown into the next higher mode 
@@ -3491,7 +3328,7 @@ SUBROUTINE m7_coaset(kproma, kbdim, klev,  krow, paernl, ptp1, &
              zhu2,        zhu
 
   !---executable procedure
-  zeps = EPSILON(1._dp)
+  zeps = THRESHOLD !EPSILON(1._dp)
 
   !---1) gridpoint properties
   DO jk=1,klev
@@ -3574,7 +3411,9 @@ SUBROUTINE m7_coaset(kproma, kbdim, klev,  krow, paernl, ptp1, &
 
            IF (lsuffaero(jl,jk,jm1) .AND. lsuffaero(jl,jk,jm2)) THEN
               !--- Average radius of the modes:
-              zrpav=zeps+0.5_dp*(pm6rp(jl,jk,jm1)+pm6rp(jl,jk,jm2)) 
+              zrpav=0.5_dp*(pm6rp(jl,jk,jm1)+pm6rp(jl,jk,jm2))
+              ! Note the pm6rp are > cimrad=1.e-8, so the following is not needed:
+              ! zrpav = MAX(zeps, 0.5_dp*(pm6rp(jl,jk,jm1)+pm6rp(jl,jk,jm2)) )
 
               !--- Fuchs: G_r (below Eq. 49.27):
               zcv2av=SQRT(zcv2(jl,jk,jm1) + zcv2(jl,jk,jm2))
@@ -3732,7 +3571,7 @@ SUBROUTINE m7_concoag (kproma,   kbdim,   klev, krow,               &
 
   !--- 0) Initializations:
 
-  zeps=EPSILON(1._dp)
+  zeps = THRESHOLD ! Use for safe division. Could use EPSILON, but smaller-in-SP THRESHOLD is ok because of the MIN(a,b/threshold). TINY would be good candidate here. 
 
 
   !--- 1) Redistribution of mass and numbers after nucleation, coagulation ----
@@ -4099,7 +3938,7 @@ END SUBROUTINE m7_concoag
   !--- 0) Initialisations: ------------------------------------------------ 
  
   ztmst  = time_step_len 
-  zeps = EPSILON(1._dp)
+  zeps = THRESHOLD
  
   za4av       = 0._dp 
   za4av1(:,:) = 0._dp
@@ -4480,6 +4319,8 @@ END SUBROUTINE m7_concoag
                        DO kmod=1,nclass
                           IF (kmod>jclass) THEN
 !kai 
+                             ! Current value of THRESHOLD (epsilon of double precision) sits between TINY and
+                             ! EPSILON. Fine, mimics original DP case when running in SP. 
                              IF (abs(zbftot).gt.zeps) then 
                                 pbfract1(jl,jk,kmod-jclass)=pbfract1(jl,jk,kmod-jclass)/zbftot
                              ELSE

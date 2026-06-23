@@ -4,7 +4,7 @@
 
 MODULE mo_tracer_processes
 
-  USE mo_kind,             ONLY: wp 
+  USE mo_kind,             ONLY: wp, THRESHOLD
   IMPLICIT NONE
 
   
@@ -101,7 +101,7 @@ MODULE mo_tracer_processes
 
     !--- 2) Mass fix mode:
 
-    zeps=EPSILON(1.0_wp)
+    zeps = THRESHOLD
 
     !--- 2.1) Calculate auxiliary variable dp/g :
     !--- Uppermost level:
@@ -139,7 +139,8 @@ MODULE mo_tracer_processes
 
           DO jk=1, klev
              DO jl=1, kproma
-                IF (ABS(zdxtdtsum(jl)) > zeps) THEN
+               ! PLS - TODO: SAFE DIVISION
+               IF (ABS(zdxtdtsum(jl)) > zeps) THEN
 
                    zxttefix=-((ABS(zxtte(jl,jk)*zdpg(jl,jk))/zdxtdtsum(jl))*zdxtdt(jl))/zdpg(jl,jk)
 
@@ -209,7 +210,7 @@ MODULE mo_tracer_processes
 
     !--- 0) Initializations:
     ztmst=time_step_len
-    zeps=10._wp*EPSILON(1.0_wp)
+    zeps=10._wp*THRESHOLD   ! Original was: 10._wp*EPSILON(1.0_wp)
 
     !--- 1) Calculate auxiliary variable dp/g :
 

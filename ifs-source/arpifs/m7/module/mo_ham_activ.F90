@@ -45,7 +45,7 @@
 
 MODULE mo_ham_activ
 
-  USE mo_kind,          ONLY: dp
+  USE mo_kind,          ONLY: dp, THRESHOLD
   USE mo_ham,           ONLY: sizeclass,nclass
 
 !#ifdef _OPENMP
@@ -207,7 +207,7 @@ CONTAINS
     pfracn(1:kproma,:,:)     = 0._dp
     pcdncact(1:kproma,:)     = 0._dp
 
-    zeps=EPSILON(1._dp)
+    zeps=THRESHOLD  ! Use for both physical cutoff and safe division 
 
     !--- Conversions to SI units [g mol-1 to kg mol-1]:
     
@@ -320,6 +320,7 @@ CONTAINS
                 !<<dod
              END DO ! jclass
 
+             ! PLS - TODO: SAFE DIVISION
              WHERE (zsum(:) > zeps)
                 psmax(jl,jk,:)=1._dp/SQRT(zsum(:))
              ELSEWHERE
@@ -558,7 +559,7 @@ CONTAINS
     zsumtop(1:kproma,:,:)  = 0._dp
     zsumbot(1:kproma,:,:)  = 0._dp
 
-    zeps=EPSILON(1._dp)
+    zeps=THRESHOLD  ! Use for safe division only here
 
     !--- Conversions to SI units [g mol-1 to kg mol-1]:
     
@@ -596,6 +597,7 @@ CONTAINS
        jclass = aerocomp(jn)%iclass
        
        IF (nion > 0 .AND. sizeclass(jclass)%lactivation) THEN      !>>dod<< #377
+         ! PLS - TODO: SAFE DIVISION       
           WHERE(zmasssum(1:kproma,:,jclass)>zeps)
 
              zmassfrac(1:kproma,:)=pxtm1(1:kproma,:,jt)/zmasssum(1:kproma,:,jclass)
@@ -696,7 +698,7 @@ CONTAINS
      
                DO jclass=1, nclass !SF the ham_m7_logtail calculation is now done mode per mode for better efficiency
                   IF (sizeclass(jclass)%lactivation) THEN
-                     IF (cfracn(jclass) > EPSILON(1._dp)) THEN !SF #279: only performs this calculation when relevant
+                     IF (cfracn(jclass) > THRESHOLD ) THEN !SF #279: only performs this calculation when relevant
                         !SF stratiform:
                         zr(1:kproma,:,jclass)=crcut
         
@@ -786,7 +788,7 @@ CONTAINS
     REAL(dp) :: zeps
     REAL(dp) :: ztmp1(kbdim,klev), ztmp2(kbdim,klev)
 
-    zeps = EPSILON(1._dp)
+    zeps = THRESHOLD !EPSILON(1._dp)
 
     DO jclass=1, nclass
        !>>dod #377

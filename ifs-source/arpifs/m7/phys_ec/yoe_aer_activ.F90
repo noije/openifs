@@ -274,7 +274,7 @@ CONTAINS
          DO JL=KIDIA,KFDIA                                                                                                                                        
             ! effective radius calculated similarly as in radlswr.F90                                                                                     
             ! 2.387e-10 is 3/(4*pi*rho_liq*10^6)  [10^6 for N in right units]                                                                             
-            ZRE_LIQ(JL,JK) = 1.E+06_JPRB*(2.387e-10_JPRB*ZRHO(JL,JK)*PQLWC(JL,JK)/ZCDNC(JL,JK))**0.333_JPRB
+            ZRE_LIQ(JL,JK) = 1.E+06_JPRB*(2.387e-10_JPRB*ZRHO(JL,JK)*PQLWC(JL,JK)/ZCDNC(JL,JK))**(1.0_JPRB/3.0_JPRB)
          END DO
       END DO
       ZRE_LIQ(KIDIA:KFDIA,1:KLEV) = MERGE(ZRE_LIQ(KIDIA:KFDIA,1:KLEV),PPREFFL_DEF,LLIQCLD(KIDIA:KFDIA,1:KLEV))
@@ -377,24 +377,17 @@ CONTAINS
     ! Seinfeld and Pandis, Atmospheric Chemistry and Physics, Second Edition (referred to as SP)
     ! Morales and Nenes, JGR, D18220, 2010
 
-    USE YOMCST,              ONLY: RG, RPI
-    USE YOMLUN,              ONLY: NULOUT
-    USE TM5M7_DATA,          ONLY: NMOD, NSOL, DDUST, DNACL, &
-                                 & DOC, DBC, DH2SO4, DNA2SO4, DNH4NO3, DMSA, &
-                                 & NH4NO3_FACTOR, Kap_su,Kap_pom,Kap_soa,    &
-                                 & Kap_bc,Kap_ss,Kap_du,Kap_na2so4,Kap_msa,    &
-                                 & Kap_no3, WSO4, WH2SO4, WNACL, WNA2SO4,    &
-                                 & WH2O, WDAIR
-    USE MO_HAM_M7CTL,        ONLY: CMR2RAM, SIGMA, SIGMALN       
-   !  USE YOE_AERO_M7_DATA,    ONLY: NMOD, NSOL, SIGMA, SIGMALN, CMR2RAM, &
-   !       & DH2SO4, DBC, DOC, DNACL, DDUST, &
-   !       & DNA2SO4, DNH4NO3, DMSA, NH4NO3_FACTOR, &
-   !       & PPKAPPA_H2SO4, PPKAPPA_NACL, PPKAPPA_NA2SO4, &
-   !       & PPKAPPA_BC, PPKAPPA_OC, PPKAPPA_DU, &
-   !       & PPKAPPA_NH4NO3, PPKAPPA_MSA, &
-   !       & WSO4, WH2SO4, WNACL, WNA2SO4, &
-   !       & WH2O, WDAIR
-    USE ND_PARAM, ONLY: CCNSPEC, PDFACTIV, NDPARAM 
+    USE YOMCST,        ONLY: RG, RPI
+    USE YOMLUN,        ONLY: NULOUT
+    USE TM5M7_DATA,    ONLY: NMOD, NSOL, DDUST, DNACL, &
+                           & DOC, DBC, DH2SO4, DNA2SO4, DNH4NO3, DMSA, &
+                           & NH4NO3_FACTOR, Kap_su,Kap_pom,Kap_soa,    &
+                           & Kap_bc,Kap_ss,Kap_du,Kap_na2so4,Kap_msa,    &
+                           & Kap_no3, WSO4, WH2SO4, WNACL, WNA2SO4,    &
+                           & WH2O, WDAIR
+    USE MO_HAM_M7CTL,  ONLY: CMR2RAM, SIGMA, SIGMALN
+    USE MO_KIND,       ONLY: THRESHOLD
+    USE ND_PARAM,      ONLY: CCNSPEC, PDFACTIV, NDPARAM 
 
     IMPLICIT NONE
 
@@ -488,7 +481,7 @@ CONTAINS
     PCDNC(KIDIA:KFDIA,KTDIA:KLEV) = 0._JPRB
     PSMAX(KIDIA:KFDIA,KTDIA:KLEV) = 0._JPRB
 
-    ZEPS=EPSILON(1._JPRB)
+    ZEPS=THRESHOLD !EPSILON(1._JPRB)
 
     ZWLARGE(KIDIA:KFDIA,KTDIA:KLEV) = -1._JPRB* PVERVEL(KIDIA:KFDIA,KTDIA:KLEV) / &
                                    &  (RG*PRHO(KIDIA:KFDIA,KTDIA:KLEV))
@@ -527,6 +520,7 @@ CONTAINS
                NCL(JL) = NNACL(JL)
                NH2SO4(JL) = NSO4(JL) - NNA2SO4(JL)
 
+               ! PLS - TODO: SAFE DIVISION               
                IF (ZVOL(JL) .GE. ZEPS) THEN !eehol: total volume per mode need to be above treshold to avoid div by zero
                   !---mode kappa = volume-weighted sum of component kappa's
                   ZKAPPA(JL,JK,JMOD) = ( (Kap_ss * NNACL(JL) * WNACL / (DNACL*1.E3_JPRB)) + &
@@ -540,11 +534,11 @@ CONTAINS
                         & ZVOL(JL)
 
                   !---defensive step: minimum kappa to avoid divide by zero errors
-                  ZKAPPA(JL,JK,JMOD) = MERGE(ZKAPPA(JL,JK,JMOD), 0.04_JPRB, ZKAPPA(JL,JK,JMOD) > 0.04_JPRB )
-                  ZKAPPA(JL,JK,JMOD) = MIN(ZKAPPA(JL,JK,JMOD),1.2_JPRB)
-               ELSE
+                  ZKAPPA(JL,JK,JMOD) = MAX(ZKAPPA(JL,JK,JMOD), 0.04_JPRB)
+                  ZKAPPA(JL,JK,JMOD) = MIN(ZKAPPA(JL,JK,JMOD), 1.2_JPRB)
+                ELSE
                   ZKAPPA(JL,JK,JMOD) = 0.04_JPRB  ! if total volume per mode is too small, use minimum kappa
-               END IF
+                END IF
             END IF
           END DO
        END DO
@@ -568,8 +562,6 @@ CONTAINS
             TPARC = PT(JL,JK) ! Temperature (K)
             PPARC = PAP(JL,JK) ! Pressure (Pa)
          
-            IF ( ANY(TPI(:) .GE. ZEPS) .AND. ANY(DPGI(:) .GE. 1e-9_JPRB) .AND. TPARC.GE.(273.15_JPRB-35.0_JPRB) ) THEN !eehol: any num con, diam and temperature need to be over treshold
-
                ! Convert aerosol data into CCN, fill BOX object
                CALL CCNSPEC (TPI,DPGI,SIGI,MODEI,TPARC,PPARC,NSOL-1,AKKI,A,B,ACCOM,BOX) 
 
@@ -602,7 +594,6 @@ CONTAINS
 
                ! convert Smax to %
                PSMAX(JL,JK) = 100._JPRB * SMAX 
-            END IF
           END IF ! LCLOUD
        END DO !jl
     END DO !jk
@@ -894,7 +885,7 @@ CONTAINS
 
           ! effect Re to volume mean from S Moss or Lohmann and Kaercher papers 200?
           ! ZRE_ICE on both LHS and RHS ??
-          ZRE_ICE=(MAX(SQRT(5.113E6_JPRB+2.809E3_JPRB*ZRE_ICE**3.0_JPRB)-2.261E3_JPRB,0.0_JPRB))**0.333_JPRB
+          ZRE_ICE=(MAX(SQRT(5.113E6_JPRB+2.809E3_JPRB*ZRE_ICE**3.0_JPRB)-2.261E3_JPRB,0.0_JPRB))**(1.0_JPRB/3.0_JPRB)
           ZRE_ICE=MAX(ZRE_ICE,1.0_JPRB)  ! diameter minimum 1.0 microns
 
           ! more default values if not applying
@@ -938,7 +929,7 @@ CONTAINS
              ENDIF
              
              !---why is this recalculated here ? 
-             ZRE_ICE=(0.75_JPRB*PRHO(JL,JK)*ZCLD/(RPI*ZRHO_ICE*1.E6_JPRB*ZICNC))**0.333_JPRB
+             ZRE_ICE=(0.75_JPRB*PRHO(JL,JK)*ZCLD/(RPI*ZRHO_ICE*1.E6_JPRB*ZICNC))**(1.0_JPRB/3.0_JPRB)
              ZRE_ICE=ZRE_ICE*1.E6_JPRB
 
              !PGFL(JL,JK,YICNC%MP9_PH) = ZICNC
