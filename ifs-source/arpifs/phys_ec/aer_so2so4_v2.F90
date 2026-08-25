@@ -99,7 +99,7 @@ REAL(KIND=JPRD), PARAMETER :: ZHCP_O3_TD = 2800._JPRD     ! temperature dependen
 REAL(KIND=JPRD), PARAMETER :: ZHCP_OH_REF = 3.8E-1_JPRD   ! H^cp(OH), Sander, ACP 2015            [mol/m3/Pa]
 !REAL(KIND=JPRD), PARAMETER :: ZHCP_OH_TD =                ! no temperature dependency for H^cp(OH)
 REAL(KIND=JPRD), PARAMETER :: ZHCP_SO2_REF = 1.3E-2_JPRD  ! H^cp(SO2), Sander, ACP 2015           [mol/m3/Pa]
-REAL(KIND=JPRD), PARAMETER :: ZHCP_SO2_TD = 2900._JPRD    ! temperature dependency for H^cp(SO2)  [K]
+REAL(KIND=JPRD), PARAMETER :: ZHCP_SO2_TD = 2100._JPRD    ! temperature dependency for H^cp(SO2)  [K]
 
 !=================================!
 ! Acid-base equilibrium constants !
@@ -491,6 +491,8 @@ DO JK=1,KLEV
 ! -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 
 ! -- aqueous fractions in the cloudy part [dimensionless]
+! -- Eq. (7.8) in Seinfeld and Pandis (Third Edition), i.e. f_A / (1 + f_A)
+! -- bug fix: ZPNEB in the original code by Remy and Bock replaced by ZCLW_VFRAC (=w_L in S&P)
          ZFAQ_H2O2 = 1._JPRD / (1._JPRD + 1._JPRD / (ZHCC_H2O2    * ZCLW_VFRAC ) )
          ZFAQ_O3   = 1._JPRD / (1._JPRD + 1._JPRD / (ZHCC_O3      * ZCLW_VFRAC ) )
          ZFAQ_SO2  = 1._JPRD / (1._JPRD + 1._JPRD / (ZHCC_SO2_EFF * ZCLW_VFRAC ) )
@@ -523,8 +525,8 @@ DO JK=1,KLEV
          ZC_OH_gas   = ZmmrOH * ZAIR_DENS / ZRMOH
 
          ! -- use aqueous fractions calculated above to get total concentrations in the cloudy part
-         ZC_H2O2_tot_cloudy = ZC_H2O2_gas * ( 1._JPRD + ZFAQ_H2O2 )
-         ZC_O3_tot_cloudy   = ZC_O3_gas * ( 1._JPRD + ZFAQ_O3 )
+         ZC_H2O2_tot_cloudy = ZC_H2O2_gas / ( 1._JPRD - ZFAQ_H2O2 )
+         ZC_O3_tot_cloudy   = ZC_O3_gas / ( 1._JPRD - ZFAQ_O3 )
 
          ! -- SO2 tracer in this scheme represents total S(iv)
          ZC_SO2_tot  = ZmmrSO2  * ZAIR_DENS / ZRMSO2
@@ -577,7 +579,8 @@ DO JK=1,KLEV
             ZC_SO2_gas_cloudy = ZC_SO2_tot_cloudy * (1._JPRD - ZFAQ_SO2)
             IF (FAST_MIXING_GAS_PHASE_SO2) THEN
                ! calculate grid box mean gas-phase concentration
-               ! reduces to the expression in the old version of the code:
+               ! reduces to the expression in the original version of the code,
+               ! with ZCLW_VFRAC replaced by ZPNEB (bug fix): 
                ! ZC_SO2_gas  = ZC_SO2_tot * (1._JPRD - ZFAQ_SO2*ZPNEB)
                ZC_SO2_gas = ZC_SO2_gas_cloudy * ZPNEB + ZC_SO2_gas_clear * (1._JPRD - ZPNEB)
                ZC_SO2_gas_clear = ZC_SO2_gas
@@ -585,10 +588,10 @@ DO JK=1,KLEV
             ENDIF
 
 ! -- aqueous phase concentration [mol / m3(aq)]    ! WARNING: these are "potential" aqueous concentrations
-            ZC_H2O2_aqp = ZC_H2O2_tot_cloudy * ZHCC_H2O2 / (1._JPRD + ZFAQ_H2O2)
-            ZC_O3_aqp = ZC_O3_tot_cloudy * ZHCC_O3 / (1._JPRD + ZFAQ_O3)
+            ZC_H2O2_aqp = ZC_H2O2_tot_cloudy * ZHCC_H2O2 * (1._JPRD - ZFAQ_H2O2)
+            ZC_O3_aqp = ZC_O3_tot_cloudy * ZHCC_O3 * (1._JPRD - ZFAQ_O3)
 
-            ZC_Siv_aqp = ZC_SO2_tot_cloudy * ZHCC_SO2_EFF / (1._JPRD + ZFAQ_SO2)
+            ZC_Siv_aqp = ZC_SO2_tot_cloudy * ZHCC_SO2_EFF * (1._JPRD - ZFAQ_SO2)
 
             ! Update fractioning between aqueous forms of S(iv)
             ZC_SO2_aqp = ZC_Siv_aqp / (1._JPRD + ZKEQ1_FACT + ZKEQ1_FACT * ZKEQ2_FACT )
