@@ -99,7 +99,8 @@ REAL(KIND=JPRD), PARAMETER :: ZHCP_O3_TD = 2800._JPRD     ! temperature dependen
 REAL(KIND=JPRD), PARAMETER :: ZHCP_OH_REF = 3.8E-1_JPRD   ! H^cp(OH), Sander, ACP 2015            [mol/m3/Pa]
 !REAL(KIND=JPRD), PARAMETER :: ZHCP_OH_TD =                ! no temperature dependency for H^cp(OH)
 REAL(KIND=JPRD), PARAMETER :: ZHCP_SO2_REF = 1.3E-2_JPRD  ! H^cp(SO2), Sander, ACP 2015           [mol/m3/Pa]
-REAL(KIND=JPRD), PARAMETER :: ZHCP_SO2_TD = 2100._JPRD    ! temperature dependency for H^cp(SO2)  [K]
+! bug fix: replaced 2100. in the original code by 2900.
+REAL(KIND=JPRD), PARAMETER :: ZHCP_SO2_TD = 2900._JPRD    ! temperature dependency for H^cp(SO2)  [K]
 
 !=================================!
 ! Acid-base equilibrium constants !
