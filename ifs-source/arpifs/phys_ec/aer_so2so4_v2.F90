@@ -127,7 +127,7 @@ REAL(KIND=JPRD), PARAMETER :: ZCONV1 = 6.0221367E+17_JPRD    ! [m3 / cm3 / mol]
 !REAL(KIND=JPRD), PARAMETER :: ZKOH_LOW300 = 3.3E-31_JPRD * ZCONV1 * ZCONV1 ! now in [m**6 / mol**2 / s]
 REAL(KIND=JPRD), PARAMETER :: ZKOH_LOW300 = 119.678230431E+3_JPRD           ! now in [m**6 / mol**2 / s]
 
-! k_OH reaction rate, high pressure limit, no temp. dependency, converted in [m**3 / (mol * s)]S
+! k_OH reaction rate, high pressure limit, no temp. dependency, converted in [m**3 / (mol * s)]
 REAL(KIND=JPRD), PARAMETER :: ZKOH_HIGH   = 1.6E-12_JPRD * ZCONV1          ! now in [m**3 / mol    / s]
 
 ! conversion factor, multiply by ZCONV3 to convert L into m3
